@@ -26,7 +26,7 @@ def destroy_database():
 
     # Drop tables, commit, make a new one.
     DATABASE.execute('''
-        DROP TABLE IF EXISTS flights
+        DROP TABLE IF EXISTS goodreads
     ''')
     DATABASE.commit()
 
