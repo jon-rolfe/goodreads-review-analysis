@@ -4,13 +4,9 @@
 Usage: ./goodanalyzer.py database
 """
 
-import os
-import sys
-import argparse
 import signal
-import logging
-from lxml import html
-import requests
+import sys
+
 from selenium import webdriver
 
 
