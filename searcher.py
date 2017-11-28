@@ -27,22 +27,28 @@ def main():
     book_title_location = book_root_location + 'td[1]/a'
     book_url_location = book_root_location + 'td[1]/a'
     book_author_location = book_root_location + 'td[2]/span[2]/a'
-    book_rating_info_location = book_root_location + 'td[2]/span[3]/span'
-    book_publish_year = book_root_location + 'td[2]/span[3]'
+    book_publish_year_location = book_root_location + 'td[2]/span[3]'
 
     page = 1
 
     while page < 101:  # GR has max 100 pages per search term
         book_on_page = 1
         while book_on_page < 21:
-            print 'title: ' + browser.find_element_by_xpath(book_title_location.format(book_on_page)).get_attribute(
-                'title')
-            print 'url: ' + browser.find_element_by_xpath(book_url_location.format(book_on_page)).get_attribute('href')
-            print 'author: ' + browser.find_element_by_xpath(book_author_location.format(book_on_page)).text
-            print 'rating info: ' + browser.find_element_by_xpath(book_rating_info_location.format(book_on_page)).text
-            print 'publish year: ' + \
-                  browser.find_element_by_xpath(book_publish_year.format(book_on_page)).text.split('published ', 1)[1][
-                  :4] + '\n'  # TODO: oh god please make this less hacky
+            book_title = browser.find_element_by_xpath(book_title_location.format(book_on_page)).get_attribute(
+                'title').encode('ascii', 'ignore')
+            book_url = 'http://goodreads.com' + browser.find_element_by_xpath(
+                book_url_location.format(book_on_page)).get_attribute('href').encode('ascii', 'ignore')
+            book_author = browser.find_element_by_xpath(book_author_location.format(book_on_page)).text.encode('ascii',
+                                                                                                               'ignore')
+            book_publish_year = int(
+                browser.find_element_by_xpath(book_publish_year_location.format(book_on_page)).text.split('published ',
+                                                                                                          1)[1][
+                :4].encode('ascii', 'ignore'))
+
+            print 'title: {}'.format(book_title)
+            print 'url: {}'.format(book_url)
+            print 'author: {}'.format(book_author)
+            print 'publish year: {}'.format(book_publish_year) + '\n'
             book_on_page += 1
 
         browser.find_element_by_class_name('next_page').click()
