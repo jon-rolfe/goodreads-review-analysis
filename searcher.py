@@ -1,13 +1,16 @@
 #!/usr/bin/env python
 
 """
-Usage: ./goodanalyzer.py database
+Usage TBD.
 """
 
 import signal
 import sys
 
 from selenium import webdriver
+
+
+# import logging (TODO)
 
 
 def main():
