@@ -4,7 +4,6 @@
 Usage TBD.
 """
 
-import logging
 import signal
 import sys
 
@@ -12,28 +11,35 @@ from selenium import webdriver
 
 from database import *
 
+logging.basicConfig(level=logging.INFO, stream=sys.stdout,
+                    format='%(levelname)s: %(message)s')  # TODO: file logging
+logger = logging.getLogger('__name__')
 
 # todo: from langdetect import detect
 
 
 def main():
-    """Does most of the magic."""
-
-    # initiate logger, initialize DB, define path to geckodriver, create browser instance,
-    logging.basicConfig(level=logging.INFO, stream=sys.stdout,
-                        format='%(levelname)s: %(message)s')  # TODO: filename='searcher.log', filemode='w',
-    logger = logging.getLogger('searcher')
+    """Goodreads searcher main script. Execution logic flow director."""
 
     init_database()
 
-    geckopath = '/Users/jonathanrolfe/Desktop/geckodriver'
+    # search_scraper()
 
+    review_scraper()
+
+
+def search_scraper():
+    """Scrapes books from a goodreads search and sends them to be added to the DB"""
+    # initiate logger, initialize DB, define path to geckodriver, create browser instance,
+
+    geckopath = '/Users/jonathanrolfe/Desktop/geckodriver'
     browser = webdriver.Firefox(executable_path=geckopath)
 
     # initiate search; get starting locations
     search_term = 'science+fiction'
     browser.get('https://www.goodreads.com/search?q={}&search_type=books&search%5Bfield%5D=genre'.format(search_term))
 
+    # xpath definitions
     book_root_location = '/html/body/div[1]/div[2]/div[1]/div[1]/div[2]/table/tbody/tr[{}]/'
     book_title_location = book_root_location + 'td[1]/a'
     book_url_location = book_root_location + 'td[1]/a'
@@ -41,7 +47,6 @@ def main():
     book_publish_year_location = book_root_location + 'td[2]/span[3]'
 
     page = 1
-
     # iterate through first 100 search pages (GR will not display past p 100)
     while page < 101:
 
@@ -59,6 +64,7 @@ def main():
                     browser.find_element_by_xpath(book_publish_year_location.format(book_on_page)).text.split(
                         'published ', 1)[1][:4].encode('ascii', 'ignore'))
             except IndexError:
+                logger.error('No publish year listed for {} - please fill manually in DB'.format(book_title))
                 book_publish_year = '0'  # (dummy value for when no date listed)
 
             logger.debug('title: {}'.format(book_title))
@@ -77,9 +83,22 @@ def main():
         page += 1
 
 
-def review_scraper:
-    """Using the preexisting book_list database, scape reviews"""
-    print 'ping'
+def review_scraper():
+    """Using the preexisting book_list database, scape reviews -
+    TABLE REFERENCE:
+        BOOK_DB_CURSOR.execute('''
+          CREATE TABLE IF NOT EXISTS "reviews" (
+            "id" INTEGER PRIMARY KEY,
+            "book_id" INTEGER,
+            "stars" INTEGER,
+            "post_date" TEXT,
+            "url" TEXT,
+            FOREIGN KEY("book_id" REFERENCES book_list("id"))
+          )
+    """
+
+    book_to_scrape = call_book('1')
+    logger.debug(book_to_scrape)
 
 
 def close(*args):
