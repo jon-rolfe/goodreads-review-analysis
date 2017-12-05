@@ -37,12 +37,10 @@ def init_database():
 
     BOOK_DB_CURSOR.execute('''
       CREATE TABLE IF NOT EXISTS "reviews" (
-        "id" INTEGER PRIMARY KEY,
-        "book_id" INTEGER,
-        "stars" INTEGER,
-        "post_date" TEXT,
-        "url" TEXT UNIQUE,
-        FOREIGN KEY("book_id") REFERENCES book_list("id")
+            "book_id" INTEGER,
+            "review_text" TEXT,
+            UNIQUE("book_id","review_text") ON CONFLICT IGNORE
+            FOREIGN KEY("book_id") REFERENCES book_list("id")
       )
     ''')
 
@@ -67,18 +65,27 @@ def add_book(title, author, publish_year, url):
     """Add newly-scraped books to the scifi DB"""
     BOOK_DB_CURSOR.execute('''
         INSERT INTO "book_list" (title, author, publish_year, url)
-        VALUES (?, ?, ?, ?)
+          VALUES (?, ?, ?, ?)
     ''', (title, author, publish_year, url))
 
     # TODO: consider moving commit statement outside function - inefficient to commit every time when bulk adding
     BOOK_DB.commit()
 
 
-def call_book(id):  # TODO: split this into two fns
+def add_review(book_id, review_text):
+    BOOK_DB_CURSOR.execute('''
+        INSERT INTO "reviews" (book_id, review_text)
+          VALUES (?,?)
+    ''', (str(book_id), review_text))
+
+    BOOK_DB.commit()
+
+
+def call_book(book_num):  # TODO: split this into two fns for more efficiency
     """Grab a book from the table by its ID"""
     BOOK_DB_CURSOR.execute('''
-        SELECT * FROM "book_list" WHERE "ID" = ?
-    ''', (id))
+        SELECT * FROM "book_list" WHERE "ID" = (?)
+    ''', (str(book_num),))
     result = BOOK_DB_CURSOR.fetchone()
 
     if result is None:  # i.e., there is no book with a given ID

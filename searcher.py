@@ -7,6 +7,7 @@ Usage TBD.
 import signal
 import sys
 
+from langdetect import detect
 from selenium import webdriver
 
 from database import *
@@ -15,9 +16,13 @@ logging.basicConfig(level=logging.INFO, stream=sys.stdout,
                     format='%(levelname)s: %(message)s')  # TODO: file logging
 logger = logging.getLogger('__name__')
 
-# todo: from langdetect import detect
+# set paths for selenium and a shared browser
+browser_driver_path = '{}\geckodriver.exe'.format(sys.path[0])
+
+browser = webdriver.Firefox(executable_path=browser_driver_path)
 
 
+# TODO: move main function to a different file, searcher + db to subfolder
 def main():
     """Goodreads searcher main script. Execution logic flow director."""
 
@@ -30,10 +35,6 @@ def main():
 
 def search_scraper():
     """Scrapes books from a goodreads search and sends them to be added to the DB"""
-    # initiate logger, initialize DB, define path to geckodriver, create browser instance,
-
-    geckopath = '/Users/jonathanrolfe/Desktop/geckodriver'
-    browser = webdriver.Firefox(executable_path=geckopath)
 
     # initiate search; get starting locations
     search_term = 'science+fiction'
@@ -84,21 +85,33 @@ def search_scraper():
 
 
 def review_scraper():
-    """Using the preexisting book_list database, scape reviews -
-    TABLE REFERENCE:
-        BOOK_DB_CURSOR.execute('''
-          CREATE TABLE IF NOT EXISTS "reviews" (
-            "id" INTEGER PRIMARY KEY,
-            "book_id" INTEGER,
-            "stars" INTEGER,
-            "post_date" TEXT,
-            "url" TEXT,
-            FOREIGN KEY("book_id" REFERENCES book_list("id"))
-          )
-    """
+    """Using the preexisting book_list database, scape reviews."""
 
-    book_to_scrape = call_book('1')
-    logger.debug(book_to_scrape)
+    book_number = 1
+
+    while book_number < book_list_size():
+
+        book_to_scrape = call_book(book_number)
+        logger.debug('scraping reviews for: {}'.format(book_to_scrape[2]))
+
+        browser.get(book_to_scrape[1])
+        reviews = browser.find_elements_by_css_selector(".reviewText [style='display:none']")
+
+        logger.debug('{} reviews'.format(len(reviews)))
+        review_count = 0
+
+        while review_count < len(reviews):
+            review_text = reviews[review_count].get_attribute("textContent")
+            try:
+                lang_detect = detect(review_text)
+                if lang_detect == 'en':
+                    add_review(book_number, review_text)
+            except:
+                logger.debug('faulty review: #{} on {}'.format(review_count, book_to_scrape[2]))
+
+            review_count += 1
+
+        book_number += 1
 
 
 def close(*args):
