@@ -4,8 +4,10 @@
 Usage TBD.
 """
 
+import random
 import signal
 import sys
+import time
 
 from langdetect import detect
 from selenium import webdriver
@@ -19,7 +21,19 @@ logger = logging.getLogger('__name__')
 # set paths for selenium and a shared browser
 browser_driver_path = '{}\geckodriver.exe'.format(sys.path[0])
 
-browser = webdriver.Firefox(executable_path=browser_driver_path)
+try:
+    # default: try to use Windows exe
+    browser = webdriver.Firefox(executable_path=browser_driver_path)
+
+# TODO: narrow the scope of the except statements (it's good form)
+except:
+    # if the exe doesn't work, strip that part off and try again (e.g. for macOS)
+    try:
+        browser_driver_path = browser_driver_path[:4]
+        browser = webdriver.Firefox(executable_path=browser_driver_path)
+    except:
+        logger.error(
+            'Could not initialize Firefox. Is Firefox installed and the geckodriver in the same directory as the script?')
 
 
 # TODO: move main function to a different file, searcher + db to subfolder
@@ -95,21 +109,36 @@ def review_scraper():
         logger.debug('scraping reviews for: {}'.format(book_to_scrape[2]))
 
         browser.get(book_to_scrape[1])
-        reviews = browser.find_elements_by_css_selector(".reviewText [style='display:none']")
 
-        logger.debug('{} reviews'.format(len(reviews)))
-        review_count = 0
+        total_book_review_count = 0
 
-        while review_count < len(reviews):
-            review_text = reviews[review_count].get_attribute("textContent")
+        # get 10 pages of reviews (a couple hundred per book)
+        while total_book_review_count < 100:
+            # reset review count per book
+            reviews = browser.find_elements_by_css_selector(".reviewText [style='display:none']")
+            logger.debug('{} reviews'.format(len(reviews)))
+            review_count = 0
+            while review_count < len(reviews):
+                review_text = reviews[review_count].get_attribute("textContent")
+                try:
+                    lang_detect = detect(review_text)
+                    if lang_detect == 'en':
+                        add_review(book_number, review_text)
+                        total_book_review_count += 1
+
+                except:
+                    logger.debug('faulty review: #{} on {}'.format(review_count, book_to_scrape[2]))
+
+                review_count += 1
+
             try:
-                lang_detect = detect(review_text)
-                if lang_detect == 'en':
-                    add_review(book_number, review_text)
+                browser.find_element_by_css_selector(".next_page").click()
             except:
-                logger.debug('faulty review: #{} on {}'.format(review_count, book_to_scrape[2]))
+                # if there's no next button, continue to next book
+                break
 
-            review_count += 1
+            # sleep to let the next page of reviews load. (randomness added for anti-anti-scraping)
+            time.sleep(5 + (random.random() * 2))
 
         book_number += 1
 
