@@ -37,6 +37,17 @@ def init_database():
 
     BOOK_DB_CURSOR.execute('''
       CREATE TABLE IF NOT EXISTS "reviews" (
+            "review_id" INTEGER PRIMARY KEY,
+            "book_id" INTEGER,
+            "review_text" TEXT,
+            UNIQUE("book_id","review_text") ON CONFLICT IGNORE
+            FOREIGN KEY("book_id") REFERENCES book_list("id")
+      )
+    ''')
+
+    BOOK_DB_CURSOR.execute('''
+      CREATE TABLE IF NOT EXISTS "clean_reviews" (
+            "review_id" INTEGER PRIMARY KEY,
             "book_id" INTEGER,
             "review_text" TEXT,
             UNIQUE("book_id","review_text") ON CONFLICT IGNORE
@@ -45,6 +56,7 @@ def init_database():
     ''')
 
     logger.debug('CREATE TABLE IF NOT EXIST statements successful')
+
     BOOK_DB.commit()
 
 
@@ -72,11 +84,20 @@ def add_book(title, author, publish_year, url):
     BOOK_DB.commit()
 
 
-def add_review(book_id, review_text):
-    BOOK_DB_CURSOR.execute('''
-        INSERT INTO "reviews" (book_id, review_text)
-          VALUES (?,?)
-    ''', (str(book_id), review_text))
+def add_review(book_id, review_text, is_clean, review_id=False):
+    """Adds a review to one of the review tables"""
+    # While this code may be redundant, I couldn't bring myself to do unsanitized input. I just couldn't.
+    if is_clean:
+        BOOK_DB_CURSOR.execute('''
+            INSERT INTO "clean_reviews" (review_id, book_id, review_text)
+              VALUES (?, ?,?)
+        ''', (review_id, book_id, review_text))
+    else:
+        # For new reviews, let review_id be autopopulated by the db.
+        BOOK_DB_CURSOR.execute('''
+            INSERT INTO "reviews" (book_id, review_text)
+              VALUES (?,?)
+        ''', (book_id, review_text))
 
     BOOK_DB.commit()
 
@@ -85,9 +106,28 @@ def call_book(book_num):  # TODO: split this into two fns for more efficiency
     """Grab a book from the table by its ID"""
     BOOK_DB_CURSOR.execute('''
         SELECT * FROM "book_list" WHERE "ID" = (?)
-    ''', (str(book_num),))
+    ''', (book_num,))
     result = BOOK_DB_CURSOR.fetchone()
 
+    if result is None:  # i.e., there is no book with a given ID
+        return False
+    else:
+        return result
+
+
+def call_review(review_num, is_clean):
+    """Grab reviews -- TODO: consolidate functions?"""
+    # Same thing as add_review -- redundant but keeps variables paramaterized
+    if is_clean:
+        BOOK_DB_CURSOR.execute('''
+            SELECT * FROM "clean_reviews" WHERE "review_id" = (?)
+        ''', (review_num,))
+    else:
+        BOOK_DB_CURSOR.execute('''
+            SELECT * FROM "reviews" WHERE "review_id" = (?)
+        ''', (review_num,))
+
+    result = BOOK_DB_CURSOR.fetchone()
     if result is None:  # i.e., there is no book with a given ID
         return False
     else:
