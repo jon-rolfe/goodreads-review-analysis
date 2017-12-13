@@ -14,9 +14,10 @@ BOOK_DB = sqlite3.connect(BOOK_DB_LOCATION)
 BOOK_DB_CURSOR = BOOK_DB.cursor()
 
 
+# noinspection SyntaxError
 def init_database():
     """Creates a SQLite DB if one doesn't already exist."""
-    # TODO: deduping check on init; logging
+    # TODO: deduping check on init; logging; add pragma for auto_vacuum 2; vacuum every X times
 
     # Check DB integrity
     BOOK_DB_CURSOR.execute('PRAGMA QUICK_CHECK')
@@ -37,7 +38,7 @@ def init_database():
 
     BOOK_DB_CURSOR.execute('''
       CREATE TABLE IF NOT EXISTS "reviews" (
-            "review_id" INTEGER PRIMARY KEY,
+            "review_id" INTEGER PRIMARY KEY ON CONFLICT IGNORE,
             "book_id" INTEGER,
             "review_text" TEXT,
             UNIQUE("book_id","review_text") ON CONFLICT IGNORE
@@ -47,7 +48,7 @@ def init_database():
 
     BOOK_DB_CURSOR.execute('''
       CREATE TABLE IF NOT EXISTS "clean_reviews" (
-            "review_id" INTEGER PRIMARY KEY,
+            "review_id" INTEGER PRIMARY KEY ON CONFLICT IGNORE,
             "book_id" INTEGER,
             "review_text" TEXT,
             UNIQUE("book_id","review_text") ON CONFLICT IGNORE
@@ -71,6 +72,11 @@ def remake_database():
     BOOK_DB.commit()
 
     init_database()
+
+
+def commit_database():
+    """For manually committing to DB (e.g., after mass-adding reviews)"""
+    BOOK_DB.commit()
 
 
 def add_book(title, author, publish_year, url):
@@ -98,8 +104,6 @@ def add_review(book_id, review_text, is_clean, review_id=False):
             INSERT INTO "reviews" (book_id, review_text)
               VALUES (?,?)
         ''', (book_id, review_text))
-
-    BOOK_DB.commit()
 
 
 def call_book(book_num):  # TODO: split this into two fns for more efficiency
@@ -150,3 +154,10 @@ def review_list_size():
     ''')
 
     return BOOK_DB_CURSOR.fetchone()[0]
+
+
+# noinspection PyUnusedLocal
+def closedb(*args):
+    """Close the database gracefully."""
+    BOOK_DB.close()
+    logger.info('db safely closed')

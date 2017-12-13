@@ -14,17 +14,14 @@ coreNLP
 
 import random
 import re
-import signal
-import sys
 import time
-
 import unicodedata
+
 from langdetect import detect
 
+from analysis import *
 from database import *
 
-logging.basicConfig(level=logging.INFO, stream=sys.stdout,
-                    format='%(levelname)s: %(message)s')  # TODO: file logging
 logger = logging.getLogger('__name__')
 
 
@@ -46,19 +43,7 @@ logger = logging.getLogger('__name__')
 #             'Could not initialize Firefox. Is Firefox installed and the geckodriver in the same directory as the script?')
 
 
-# TODO: move main function to a different file, searcher + db to subfolder
-def main():
-    """Goodreads searcher main script. Execution logic flow director."""
-
-    # init_database()
-
-    # search_scraper()
-
-    # review_scraper()
-
-    text_cleaning()
-
-
+# noinspection SpellCheckingInspection
 def search_scraper():
     """Scrapes books from a goodreads search and sends them to be added to the DB"""
 
@@ -114,7 +99,6 @@ def review_scraper():
     """Using the preexisting book_list database, scape reviews."""
 
     book_number = 1
-
     num_books = book_list_size()
 
     while book_number < (num_books + 1):
@@ -134,13 +118,13 @@ def review_scraper():
             logger.debug('{} reviews'.format(len(reviews)))
             review_count = 0
             while review_count < len(reviews):
+
                 try:
                     review_text = reviews[review_count].get_attribute("textContent")
                     lang_detect = detect(review_text)
                     if lang_detect == 'en':
                         add_review(book_number, review_text, False)
                         total_book_review_count += 1
-
                 except:
                     logger.info('faulty review: #{} on {}'.format(review_count, book_to_scrape[2]))
 
@@ -152,7 +136,8 @@ def review_scraper():
                 # if there's no next button, continue to next book
                 break
 
-            # sleep to let the next page of reviews load. (randomness added for anti-anti-scraping)
+            # commit reviews and sleep to let the next page of reviews load. (randomness added for anti-anti-scraping)
+            commit_database()
             time.sleep(3 + (random.random() * 2))
             page_number += 1
 
@@ -161,6 +146,7 @@ def review_scraper():
 
 def text_cleaning():
     """Our raw data has issues that impacts NLP and must be cleaned. THIS FUNCTION IS VERY REDUNDANT FOR CLARITY"""
+    logger.info('review cleaning started')
 
     review_id = 1
     num_reviews = review_list_size()
@@ -174,22 +160,51 @@ def text_cleaning():
         # Source data should be in English, so this shouldn't introduce bias into analysis.
         review_text = unicodedata.normalize('NFKD', review_text).encode('ascii', 'ignore')
 
-        # strip links and * characters using regex
-        review_text = re.sub(r'(http\S+|\*)', '', review_text)
-        # add a space after digits/break characters - random whitespace didn't make it from the scraper.
-        review_text = re.sub(r'(\d\D|[\.!\?/\\;:])', '\g<1> ', review_text)
-        # strip extra whitespaces
-        review_text = re.sub(r'\s\s+', ' ', review_text)
+        # strip links, repeated dashes, and * characters using regex
+        review_text = re.sub(r'(http\S+|\*|---+)', '', review_text)
+        # add a space after numbers/break characters - whitespace didn't always make it from the scraper.
+        review_text = re.sub(r'(\d+|[.!?/\\;:\(\)])', '\g<1> ', review_text)
+        # strip spoiler tags
+        review_text = re.sub(r'(\(view spoiler\)\[|\(hide spoiler\)\])', '', review_text)
+        # strip extra whitespaces and newlines
+        review_text = re.sub(r'\s\s+|\n', ' ', review_text)
+        # strip the mysterious "more" at the end of some reviews. this *shouldn't* happen, but scraping is imperfect.
+        review_text = re.sub(r'. . . . more $', '', review_text)
 
         add_review(review_book_id, review_text, True, review_id)
+        review_id += 1
 
-def close(*args):
-    """Handles sigint/unexpected program exit"""
-    sys.exit(1)
+        # commit occasionally for good measure
+        if review_id % 50000 == 0:
+            commit_database()
+            logger.info('committed {}'.format(review_id))
+
+    # a last commit for the stragglers
+    commit_database()
+    logger.info('final count: {}'.format(review_id))
 
 
-if __name__ == "__main__":
-    # make a SIGINT handler for ctrl-c, etc
-    signal.signal(signal.SIGINT, close)
-    # call main
-    main()
+def export_reviews():
+    """Export the cleaned reviews into a mass of plaintext"""
+
+    logger.info('review export started')
+    try:
+        file_object = open('raw_output.txt', 'w')
+    except IOError:
+        logger.error('Could not open raw_output file (does Python have write access to this folder?)')
+        close()
+
+    review_id = 1
+    num_reviews = review_list_size()
+
+    while review_id < (num_reviews + 1):
+        review_to_print = call_review(review_id, True)
+        try:
+            review_text_to_print = review_to_print[2]
+        except TypeError:  # protect against things like "expected string, got bool"
+            logger.info('broken review: {}'.format(review_id))
+
+        file_object.write(review_text_to_print + '\n')
+        review_id += 1
+
+    file_object.close()
