@@ -141,3 +141,12 @@ def book_list_size():
     ''')
 
     return BOOK_DB_CURSOR.fetchone()[0]
+
+
+def review_list_size():
+    """Get the number of reviews in the reviews table (e.g. for counters)"""
+    BOOK_DB_CURSOR.execute('''
+        SELECT COUNT(*) FROM "reviews"
+    ''')
+
+    return BOOK_DB_CURSOR.fetchone()[0]

@@ -113,9 +113,11 @@ def search_scraper():
 def review_scraper():
     """Using the preexisting book_list database, scape reviews."""
 
-    book_number = 2510
+    book_number = 1
 
-    while book_number < book_list_size():
+    num_books = book_list_size()
+
+    while book_number < (num_books + 1):
 
         book_to_scrape = call_book(book_number)
         logger.debug('scraping reviews for: {}'.format(book_to_scrape[2]))
@@ -161,22 +163,25 @@ def text_cleaning():
     """Our raw data has issues that impacts NLP and must be cleaned. THIS FUNCTION IS VERY REDUNDANT FOR CLARITY"""
 
     review_id = 1
-    target_review = call_review(review_id, False)
-    review_book_id = target_review[1]
-    review_text = target_review[2]
+    num_reviews = review_list_size()
 
-    # Unicode will play merry hell with cleaning/NLP processing, so normalize then encode as ASCII.
-    # Source data should be in English, so this shouldn't introduce bias into analysis.
-    review_text = unicodedata.normalize('NFKD', review_text).encode('ascii', 'ignore')
+    while review_id < (num_reviews + 1):
+        target_review = call_review(review_id, False)
+        review_book_id = target_review[1]
+        review_text = target_review[2]
 
-    # strip links and * characters using regex
-    review_text = re.sub(r'(http\S+|\*)', '', review_text)
-    # add a space after digits/break characters - random whitespace didn't make it from the scraper.
-    review_text = re.sub(r'(\d\D|[\.!\?/\\;:])', '\g<1> ', review_text)
-    # strip extra whitespaces
-    review_text = re.sub(r'\s\s+', ' ', review_text)
+        # Unicode will play merry hell with cleaning/NLP processing, so normalize then encode as ASCII.
+        # Source data should be in English, so this shouldn't introduce bias into analysis.
+        review_text = unicodedata.normalize('NFKD', review_text).encode('ascii', 'ignore')
 
-    add_review(review_book_id, review_text, True, review_id)
+        # strip links and * characters using regex
+        review_text = re.sub(r'(http\S+|\*)', '', review_text)
+        # add a space after digits/break characters - random whitespace didn't make it from the scraper.
+        review_text = re.sub(r'(\d\D|[\.!\?/\\;:])', '\g<1> ', review_text)
+        # strip extra whitespaces
+        review_text = re.sub(r'\s\s+', ' ', review_text)
+
+        add_review(review_book_id, review_text, True, review_id)
 
 def close(*args):
     """Handles sigint/unexpected program exit"""
